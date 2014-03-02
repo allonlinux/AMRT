@@ -134,8 +134,7 @@ public class AMRT {
 			
 			// Process detected medias
 			MediaOccurence l__medias[]=l__mediaList.toArray(new MediaOccurence[l__mediaList.size()]);
-			//for (int i=0;i<l__medias.length;i++) {
-			for (int i=11;i<14;i++) {
+			for (int i=0;i<l__medias.length;i++) {
 				MediaCodec l__codec=l__medias[i].pattern.codec;
 				
 				switch( l__codec ) {
@@ -145,8 +144,11 @@ public class AMRT {
 						if (	i+2 < l__medias.length && 
 								(l__medias[i+1].pattern.codec == MediaCodec.MP4_mp42 || l__medias[i+1].pattern.codec == MediaCodec.MP4_avc1)  && 
 								(l__medias[i+2].pattern.codec == MediaCodec.MP4_mp42 || l__medias[i+2].pattern.codec == MediaCodec.MP4_avc1) ) {
-							Video.recover(l__channel,l__medias[i],l__medias[i+1],l__medias[i+2]);
-							i+=2;
+							boolean l__result=Video.recover(l__channel,l__medias[i],l__medias[i+1],l__medias[i+2]);
+							if (l__result)
+								i+=2;
+							else
+								i+=1;
 						}
 						break;
 					}
@@ -159,8 +161,11 @@ public class AMRT {
 						if (	i+1 < l__medias.length && 
 								(l__medias[i].pattern.codec == MediaCodec.MP4_mp42 || l__medias[i].pattern.codec == MediaCodec.MP4_avc1)  && 
 								(l__medias[i+1].pattern.codec == MediaCodec.MP4_mp42 || l__medias[i+1].pattern.codec == MediaCodec.MP4_avc1) ) {
-							Video.recover(l__channel, null,l__medias[i],l__medias[i+1]);
-							i+=2;
+							boolean l__result=Video.recover(l__channel, null,l__medias[i],l__medias[i+1]);
+							if (l__result)
+								i+=2;
+							else
+								i+=1;
 						}
 						//Video.recover(l__channel,l__medias[i]);
 						break;

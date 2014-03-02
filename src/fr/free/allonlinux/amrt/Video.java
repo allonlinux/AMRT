@@ -9,7 +9,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
-import java.util.LinkedList;
 import java.util.TimeZone;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -233,14 +232,8 @@ public class Video {
 		
 	}
 	
-	// Check if next occurence is present at the good position
-	// If (yes)
-	//     check if
-	//     add(current)
-	
-	static byte g__comparisonArray[]=new byte[Math.max(VideoStreamPattern.length, AudioStreamPattern.length)];
+	static byte g__comparisonArray[]=new byte[Math.max(16,Math.max(VideoStreamPattern.length, AudioStreamPattern.length))];
 	static ByteBuffer g__comparisonBuffer = ByteBuffer.wrap(g__comparisonArray);
-	static LinkedList<byte[]> g__previousBuffer=new LinkedList<byte[]>();
 	
 	public static boolean isMediaPresent(FileChannel  i__stream, long i__offset, StreamType i__type) throws IOException {
 		// Read buffer
@@ -252,12 +245,6 @@ public class Video {
 		if ( i__type == StreamType.Video ) {				
 			// Compare
 			if ( g__comparisonArray[0] == VideoStreamPattern[0] && g__comparisonArray[1] == VideoStreamPattern[1] && g__comparisonArray[2] == VideoStreamPattern[2] && g__comparisonArray[3] == VideoStreamPattern[3] && g__comparisonArray[4] == VideoStreamPattern[4] ) {
-				// Add in the circular list
-				if ( g__previousBuffer.size() > 5)
-					g__previousBuffer.remove(0);
-				
-				
-				
 				return true;
 			}
 		} else {
@@ -334,8 +321,15 @@ public class Video {
 			i__stream.transferTo( i__mediaLRV.offset, l__videoLRV.headerSize, l__outputLRV);
 			
 			while ( l__current != null ) {
-				// Check if next block is found
-				if ( isMediaPresent(i__stream,l__current.blockOffset+l__current.blockSize,l__current.video.offsets.get(l__current.blockIndex+1).type) ) {
+				// Check if next block is present at the good position
+				boolean l__isPresent=isMediaPresent(i__stream,l__current.blockOffset+l__current.blockSize,l__current.video.offsets.get(l__current.blockIndex+1).type);
+				
+				// Check that we are reading the good video <-- in case of an offset overlapping between the two videos...
+				if (l__isPresent)
+					l__isPresent=l__current.validityCheck(g__comparisonArray);
+				
+				// If next block is found
+				if ( l__isPresent ) {
 					//System.out.printf("Offset of the next block stream found at position : %x\n",l__current.blockOffset+l__current.blockSize);
 					
 					// Copy to the output file
