@@ -1,0 +1,5 @@
+Manifest-Version: 1.0
+Main-Class: fr.free.allonlinux.amrt.AMRT
+Specification-Version: 0.2
+Implementation-Version: build4
+
