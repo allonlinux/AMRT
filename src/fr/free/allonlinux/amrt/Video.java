@@ -299,6 +299,9 @@ public class Video {
 				l__outputTHM=(new FileOutputStream(AMRT.outputDirectory+"GOPRO_"+l__videoMP4.getCreationTime()+".THM")).getChannel();
 			FileChannel l__outputMP4=(l__outputFileStreamMP4=new FileOutputStream(AMRT.outputDirectory+"GOPRO_"+l__videoMP4.getCreationTime()+".MP4")).getChannel();
 			FileChannel l__outputLRV=(l__outputFileStreamLRV=new FileOutputStream(AMRT.outputDirectory+"GOPRO_"+l__videoMP4.getCreationTime()+".LRV")).getChannel();
+			// In debug mode, we can use /dev/null as the output file if we don't want to write the videos (fasten the debugging)
+			//FileChannel l__outputMP4=(l__outputFileStreamMP4=new FileOutputStream("/dev/null")).getChannel();
+			//FileChannel l__outputLRV=(l__outputFileStreamLRV=new FileOutputStream("/dev/null")).getChannel();
 	
 			VideoPlop l__current=new VideoPlop(l__videoMP4,l__outputMP4);
 			l__current.blockOffset=l__firstMP4Offset-(l__videoMP4.offsets.get(0).offset %AMRT.FILESYSTEM_CLUSTER_SIZE);
@@ -359,43 +362,75 @@ public class Video {
 						System.out.println("Error : bad block size");
 						return true;
 					}
-				} else {
-					// Check if it was the last block
+				} 
+				// The next block of the "current" video  has not been found. We now need to :
+				// - find where starts the next cluster of the "other" video
+				// - write the potential remaining clusters from the "current" video (which don't contain the next block pattern)
+				// - update the information about the next block for both videos
+				// - switch "current" and "other" for the next iteration of the loop
+				else {
+					// Check if the "other" video is already completely processed
 					if ( l__other == null ) {
 						break;
 					}
-						
-					long l__modulo=AMRT.FILESYSTEM_CLUSTER_SIZE-(l__current.blockOffset% AMRT.FILESYSTEM_CLUSTER_SIZE);
 					
 					// Find the next occurence of the "other" video from the beginning of the next cluster
+					// - calculate the number of bytes to the end of the cluster, from the last block of the "current" video
+					long l__modulo=AMRT.FILESYSTEM_CLUSTER_SIZE-(l__current.blockOffset% AMRT.FILESYSTEM_CLUSTER_SIZE);
+					// - the starting offset to find the "other video" block is the beginning of the next cluster 
 					long l__startOffset=l__current.blockOffset+l__modulo;
 					long l__currentOffset=l__startOffset;
-					// TODO : find
+					
+					// Search for the next block of the "other" video in the next clusters
 					while ( true ) {
-						// Compare
+						// Check if the block of the "other" video is present in the current cluster
 						if ( isMediaPresent(i__stream, l__currentOffset+l__other.blockSize, l__other.video.offsets.get(l__other.blockIndex+1).type) ) {
 							break;
-						} else {
-							l__currentOffset+=AMRT.FILESYSTEM_CLUSTER_SIZE;
 						}
-						
-						// Check we are not going too far...
-						if ( l__currentOffset >= i__mediaMP4.offset ) {
-							System.out.println("Error : could not find the offset of the video");
-							return true;
-						}		
+						// Otherwise, continue with the next cluster
+						else {
+							l__currentOffset+=AMRT.FILESYSTEM_CLUSTER_SIZE;
+							
+							// But before, check that we are not going too far...
+							if ( l__currentOffset >= i__mediaMP4.offset ) {
+								System.out.println("Error : could not find the offset of the video");
+								return true;
+							}	
+						}	
 					}
 					
-					// Copy the current video until the "l__currentOffset"
+					// Copy the remaining bytes of the last cluster from the "current" video
 					i__stream.transferTo( l__current.blockOffset, l__currentOffset-l__current.blockOffset, l__current.channel);
 	
-					// Update information
+					// Sanity check : 
+					// - if the next "block" is supposed to be in the current "cluster", there is a big problem because we didn't find it...
 					if (l__current.blockSize <= l__currentOffset-l__current.blockOffset) {
-						System.out.println("Error : bad block size : "+l__current.blockSize+"/"+l__currentOffset+"/"+l__current.blockOffset);
-						return true;
+						// - but, unfortunately, the next block pattern of the "current" video can be split between two clusters : starts at the end of cluster 'n' and ends at the beginning of cluster 'n+i'
+						// with 'i' clusters of the "other" video in the  middle...
+						long l__remainingSize= ( l__currentOffset-l__current.blockOffset)-l__current.blockSize ;
+						if ( l__current.video.offsets.get(l__current.blockIndex+1).type == StreamType.Video && l__remainingSize < VideoStreamPattern.length ||
+								l__current.video.offsets.get(l__current.blockIndex+1).type == StreamType.Audio && l__remainingSize < AudioStreamPattern.length  )
+						{
+							System.out.println("Information : next block pattern on two clusters separated by the other video");
+							
+							// Increment the 'blockIndex' because we found the next block !
+							l__current.blockIndex++;
+							// Update the block information of the "current" video and set the 'blockOffset' to '0'.
+							// It will be updated with the good value the next time we switch the videos
+							l__current.blockSize=l__current.video.offsets.get(l__current.blockIndex+1).offset-l__current.video.offsets.get(l__current.blockIndex).offset-l__remainingSize;
+							l__current.blockOffset=0;
+						} else {
+							System.out.println("Error : bad block size : "+l__current.blockSize+"/"+l__currentOffset+"/"+l__current.blockOffset);
+							return true;
+						}
+					} else {
+						// Update the block information of the "current" video and set the 'blockOffset' to '0'.
+						// It will be updated with the good value the next time we switch the videos
+						l__current.blockSize -=  l__currentOffset-l__current.blockOffset;
+						l__current.blockOffset = 0;
 					}
-					l__current.blockSize -=  l__currentOffset-l__current.blockOffset;
-					l__current.blockOffset = 0;
+					
+					// Update the block information of the "other" video
 					l__other.blockOffset=l__currentOffset;
 					if ( l__other.blockIndex == 0 ) {
 						l__other.blockSize = l__other.video.offsets.get(1).offset-l__other.video.offsets.get(0).offset;
@@ -406,7 +441,7 @@ public class Video {
 						l__other.blockIndex=0;
 					}
 					
-					// Switch videos
+					// Switch videos, so we continue processing the "other" video
 					VideoPlop l__tmp=l__current;
 					l__current=l__other;
 					l__other=l__tmp;
@@ -428,7 +463,6 @@ public class Video {
 				if ( l__outputFileStreamLRV != null )
 					l__outputFileStreamLRV.close();
 			} catch (IOException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 		}
