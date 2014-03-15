@@ -112,8 +112,7 @@ public class Video {
 		l__4Bytes.clear();i__stream.read(l__4Bytes);l__4Bytes.rewind();
 		l__string=new String(l__4Bytes.array(), "ASCII");
 		if ( !l__string.equals("mdat") ) {
-			System.out.println("Header is not valid");
-			return null;
+			throw new IOException("Failed to read the header : not valid");
 		}
 		
 		// Get the dataSize
