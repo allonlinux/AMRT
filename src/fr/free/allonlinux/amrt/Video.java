@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.Iterator;
 import java.util.TimeZone;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -137,99 +138,85 @@ public class Video {
 		// 2/ Create Matcher to find the occurence of 'stco' in the header
 		// stco + 4 bytes at 0x00 + 4 bytes (nb_frames/audio) + 4*nb_frames/audio offset
 		Pattern l__offsetPattern = Pattern.compile("stco");
-        Matcher l__matcher = l__offsetPattern.matcher(new ByteSequence(l__bufferArray));
+		Matcher l__matcher = l__offsetPattern.matcher(new ByteSequence(l__bufferArray));
 		// - 1st occurence (video)
-        if (l__matcher.find() ) {
-        	int l_stcoOffset=l__matcher.start();
-	    	//System.out.println("Offset :- "+l_stcoOffset);
-	        l__headerBytes.position(l_stcoOffset+8);
-	    	int l__nbVideoChunks=l__headerBytes.getInt();
-	    	for(int i=0;i<l__nbVideoChunks;i++) {
-	    		int l__currentSize=l__headerBytes.getInt();
-	    		l__result.offsets.add(new MediaStreamOffset(StreamType.Video,l__currentSize));
-	    	}
-	    	// Set the number of frames
-	    	l__result.nbFrames=l__nbVideoChunks;
-        }
-		// - 2nd occurence (audio)
-        /*if (l__matcher.find() ) {
-        	int l_stcoOffset=l__matcher.start();
-        	//System.out.println("Offset :- "+l_stcoOffset);
-        	l__headerBytes.position(l_stcoOffset+8);
-        	int l__nbAudioChunks=l__headerBytes.getInt();
-        	for(int i=0;i<l__nbAudioChunks;i++) {
-        		int l__currentSize=l__headerBytes.getInt();
-        		l__result.offsets.add(new MediaStreamOffset(StreamType.Audio,l__currentSize));
-        	}
-        }*/
-    	//System.out.println(l__nbVideoChunks+" - "+l__nbAudioChunks);
-        // - sort offsets
-        Collections.sort(l__result.offsets, new Comparator<MediaStreamOffset>(){
-        	public int compare(MediaStreamOffset l__val1, MediaStreamOffset l__val2) {
-    	        return (int)(l__val1.offset - l__val2.offset);
-    	    }
-        });
-
-    	// Read Movie Header Atom
-    	Pattern l__creationTimePattern = Pattern.compile("mvhd");
-        l__matcher = l__creationTimePattern.matcher(new ByteSequence(l__bufferArray));
-        if ( l__matcher.find() ) {
-        	int l__mvhdOffset=l__matcher.start();
-        	
-        	// - get creation time
-        	l__headerBytes.position(l__mvhdOffset+4);
-        	l__result.creationTime=new Date((l__headerBytes.getLong() - 2082844800L) * 1000L);
-        	
-        	// - get duration
-        	l__headerBytes.position(l__mvhdOffset+16);
-        	int l__timeScale=l__headerBytes.getInt();
-        	int l__duration=l__headerBytes.getInt();
-        	l__result.duration=l__duration/l__timeScale;
-        }
-
-		
-    	
+		if (l__matcher.find() ) {
+			int l_stcoOffset=l__matcher.start();
+				//System.out.println("Offset :- "+l_stcoOffset);
+				l__headerBytes.position(l_stcoOffset+8);
+				int l__nbVideoChunks=l__headerBytes.getInt();
+				for(int i=0;i<l__nbVideoChunks;i++) {
+					int l__currentSize=l__headerBytes.getInt();
+					l__result.offsets.add(new MediaStreamOffset(StreamType.Video,l__currentSize));
+				}
+				// Set the number of frames
+				l__result.nbFrames=l__nbVideoChunks;
+			}
+			// - 2nd occurence (audio)
+			/*if (l__matcher.find() ) {
+				int l_stcoOffset=l__matcher.start();
+				//System.out.println("Offset :- "+l_stcoOffset);
+				l__headerBytes.position(l_stcoOffset+8);
+				int l__nbAudioChunks=l__headerBytes.getInt();
+				for(int i=0;i<l__nbAudioChunks;i++) {
+					int l__currentSize=l__headerBytes.getInt();
+					l__result.offsets.add(new MediaStreamOffset(StreamType.Audio,l__currentSize));
+				}
+			}*/
+			//System.out.println(l__nbVideoChunks+" - "+l__nbAudioChunks);
+			// - sort offsets
+			Collections.sort(l__result.offsets, new Comparator<MediaStreamOffset>(){
+				public int compare(MediaStreamOffset l__val1, MediaStreamOffset l__val2) {
+					return (int)(l__val1.offset - l__val2.offset);
+				}
+			});
+	
+			// Read Movie Header Atom
+			Pattern l__creationTimePattern = Pattern.compile("mvhd");
+			l__matcher = l__creationTimePattern.matcher(new ByteSequence(l__bufferArray));
+			if ( l__matcher.find() ) {
+				int l__mvhdOffset=l__matcher.start();
+				
+				// - get creation time
+				l__headerBytes.position(l__mvhdOffset+4);
+				l__result.creationTime=new Date((l__headerBytes.getLong() - 2082844800L) * 1000L);
+				
+				// - get duration
+				l__headerBytes.position(l__mvhdOffset+16);
+				int l__timeScale=l__headerBytes.getInt();
+				int l__duration=l__headerBytes.getInt();
+				l__result.duration=l__duration/l__timeScale;
+			}
+			
 		return l__result;
 	}
 
 	public static void recover(FileChannel  i__stream, MediaOccurence i__video) throws IOException {
-		System.out.println("TODO...");
-		return;
-		/*Video l__video=Video.readHeader(i__stream, i__video.offset,i__video.pattern);
+		/*// Read the video information from the video
+		Video l__video=Video.readHeader(i__stream, i__video.offset,i__video.pattern);
 		System.out.println(l__video+"\n");
 		
-		byte[] l__array = new byte[Math.max(VideoStreamPattern.length, AudioStreamPattern.length)];
-		ByteBuffer l__buffer = ByteBuffer.wrap(l__array);
-				
+		// Create the output file
+		FileOutputStream l__outputFileStreamMP4=null;
+		FileChannel l__outputMP4=(l__outputFileStreamMP4=new FileOutputStream(AMRT.outputDirectory+"GOPRO_"+l__video.getCreationTime()+".MP4")).getChannel();
+		
+		// Calculate the estimate position of the video data
+		// Note : we decrease the offset by "l__video.headerSize" because the offset of the block is relative to the absolute file (=with the header)
+		long l__firstOffset=i__video.offset-l__video.dataSize-l__video.headerSize;
+		
+		// Check the content and write it in the output file
 		ArrayList<MediaStreamOffset> l__offsets=l__video.offsets;
-		//int l__cpt=0;
 		for(Iterator<MediaStreamOffset> it=l__offsets.iterator();it.hasNext();) {
 			MediaStreamOffset l__item=it.next();
 			
-			// Check if the pattern is at the good place
-			long l__position=l__item.offset+(i__video.offset-l__video.dataSize-l__video.headerSize);
-			//System.out.printf("Current position (n=%d) : 0x%x\n",l__cpt++,l__position);
-			i__stream.position(l__position);
-			l__buffer.clear();
-			i__stream.read(l__buffer);
-			
-			if ( l__item.type == StreamType.Audio ) {
-				//System.out.println(l__array[0]+"-"+l__array[1]); // 26-42-76-122
-				if ( l__array[0] != AudioStreamPattern[0] ) {
-					System.out.printf("Error : bad audio offset at position 0x%x\n",l__position);
-					//System.out.println(l__array[0]+"-"+l__array[1]+"-"+l__array[2]+"-"+l__array[3]+"-"+l__array[4]);
-					return;
-				}
-			} else {
-				if ( l__array[0] != VideoStreamPattern[0] || l__array[1] != VideoStreamPattern[1] || l__array[2] != VideoStreamPattern[2] || l__array[3] != VideoStreamPattern[3] || l__array[4] != VideoStreamPattern[4] ) {
-					System.out.printf("Error : bad video offset at position 0x%x\n",l__position);
-					return;
-				}
-				
+			// Check that the pattern is at the good place
+			if ( ! Video.isMediaPresent(i__stream,l__firstOffset+l__item.offset,l__item.type) ) {
+				return;
 			}
 			
+			// Copy to the output file
+			i__stream.transferTo(i__mediaTHM.offset, l__firstMP4Offset-i__mediaTHM.offset, l__outputMP4);
 		}*/
-		
 	}
 	
 	static byte g__comparisonArray[]=new byte[Math.max(16,Math.max(VideoStreamPattern.length, AudioStreamPattern.length))];
@@ -451,7 +438,7 @@ public class Video {
 			// Close channels
 			l__outputMP4.close();
 			l__outputLRV.close();
-		} catch (IOException e) {
+		} catch (Exception e) {
 			e.printStackTrace();
 			return false;
 		} finally {
