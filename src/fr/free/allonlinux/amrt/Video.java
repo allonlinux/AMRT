@@ -9,7 +9,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
-import java.util.Iterator;
 import java.util.TimeZone;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -255,6 +254,13 @@ public class Video {
 			// Print information
 			System.out.println(l__videoMP4+"\n");
 			System.out.println(l__videoLRV+"\n");
+			
+			// Check if we are processing the good videos
+			// Note : there can be 1-2 seconds of difference...
+			if ( Math.abs(l__videoMP4.creationTime.getTime()- l__videoLRV.creationTime.getTime()) > 2000 ) {
+				System.out.println("The creation time of the MP4 and LRV videos doesn't match... Next !");
+				return false;
+			}
 			
 			// Find the beginning of the MP4 video
 			long l__firstMP4Offset=0;
