@@ -86,12 +86,21 @@ public class Video {
 		//ByteBuffer l__1Byte = ByteBuffer.allocate(1);l__1Byte.clear();
 		
 		// Get header size : 
-		// -> 4 bytes at 'i__headerOffset+0x20' position
+		// - 4 bytes at 'i__headerOffset+0x20' position
 		i__stream.position(i__headerOffset+0x20);
 		l__4Bytes.clear();i__stream.read(l__4Bytes);l__4Bytes.rewind();
-		l__result.headerSize=l__4Bytes.getInt()+0x28; // header = size + pre-header=0x28
+		l__result.headerSize=l__4Bytes.getInt()+0x20; // header = size + pre-header=0x20
+		// - 4 bytes to get the "free" ATOM size if it is a "avc1" video (GoPro Hero 3+)
+		if ( i__pattern.codec.equals(MediaCodec.MP4_avc1) ) {
+			i__stream.position(i__headerOffset+l__result.headerSize);
+			l__4Bytes.clear();i__stream.read(l__4Bytes);l__4Bytes.rewind();
+			l__result.headerSize+=l__4Bytes.getInt();
+		}
+		// - 8 bytes
+		l__result.headerSize+=8;
 		// Header size is modulo 'FILESYSTEM_CLUSTER_SIZE'
 		if ( (l__result.headerSize % AMRT.FILESYSTEM_CLUSTER_SIZE) != 0) {
+			System.out.println("Warning : the header size should be a factor of the cluster size : "+l__result.headerSize);
 			l__result.headerSize=((l__result.headerSize / AMRT.FILESYSTEM_CLUSTER_SIZE)+1) * AMRT.FILESYSTEM_CLUSTER_SIZE;
 		}
 		//System.out.printf("Header size : %x\n",l__result.headerSize);
@@ -133,58 +142,62 @@ public class Video {
 		ByteBuffer l__headerBytes = ByteBuffer.wrap(l__bufferArray);
 		i__stream.position(i__headerOffset);
 		i__stream.read(l__headerBytes);
+		
 		// 2/ Create Matcher to find the occurence of 'stco' in the header
 		// stco + 4 bytes at 0x00 + 4 bytes (nb_frames/audio) + 4*nb_frames/audio offset
 		Pattern l__offsetPattern = Pattern.compile("stco");
 		Matcher l__matcher = l__offsetPattern.matcher(new ByteSequence(l__bufferArray));
+		
 		// - 1st occurence (video)
 		if (l__matcher.find() ) {
 			int l_stcoOffset=l__matcher.start();
-				//System.out.println("Offset :- "+l_stcoOffset);
-				l__headerBytes.position(l_stcoOffset+8);
-				int l__nbVideoChunks=l__headerBytes.getInt();
-				for(int i=0;i<l__nbVideoChunks;i++) {
-					int l__currentSize=l__headerBytes.getInt();
-					l__result.offsets.add(new MediaStreamOffset(StreamType.Video,l__currentSize));
-				}
-				// Set the number of frames
-				l__result.nbFrames=l__nbVideoChunks;
+			//System.out.println("Offset :- "+l_stcoOffset);
+			l__headerBytes.position(l_stcoOffset+8);
+			int l__nbVideoChunks=l__headerBytes.getInt();
+			for(int i=0;i<l__nbVideoChunks;i++) {
+				int l__currentSize=l__headerBytes.getInt();
+				l__result.offsets.add(new MediaStreamOffset(StreamType.Video,l__currentSize));
 			}
-			// - 2nd occurence (audio)
-			/*if (l__matcher.find() ) {
-				int l_stcoOffset=l__matcher.start();
-				//System.out.println("Offset :- "+l_stcoOffset);
-				l__headerBytes.position(l_stcoOffset+8);
-				int l__nbAudioChunks=l__headerBytes.getInt();
-				for(int i=0;i<l__nbAudioChunks;i++) {
-					int l__currentSize=l__headerBytes.getInt();
-					l__result.offsets.add(new MediaStreamOffset(StreamType.Audio,l__currentSize));
-				}
-			}*/
-			//System.out.println(l__nbVideoChunks+" - "+l__nbAudioChunks);
-			// - sort offsets
-			Collections.sort(l__result.offsets, new Comparator<MediaStreamOffset>(){
-				public int compare(MediaStreamOffset l__val1, MediaStreamOffset l__val2) {
-					return (int)(l__val1.offset - l__val2.offset);
-				}
-			});
-	
-			// Read Movie Header Atom
-			Pattern l__creationTimePattern = Pattern.compile("mvhd");
-			l__matcher = l__creationTimePattern.matcher(new ByteSequence(l__bufferArray));
-			if ( l__matcher.find() ) {
-				int l__mvhdOffset=l__matcher.start();
-				
-				// - get creation time
-				l__headerBytes.position(l__mvhdOffset+4);
-				l__result.creationTime=new Date((l__headerBytes.getLong() - 2082844800L) * 1000L);
-				
-				// - get duration
-				l__headerBytes.position(l__mvhdOffset+16);
-				int l__timeScale=l__headerBytes.getInt();
-				int l__duration=l__headerBytes.getInt();
-				l__result.duration=l__duration/l__timeScale;
+			// Set the number of frames
+			l__result.nbFrames=l__nbVideoChunks;
+		}
+		
+		// - 2nd occurence (audio)
+		/*if (l__matcher.find() ) {
+			int l_stcoOffset=l__matcher.start();
+			//System.out.println("Offset :- "+l_stcoOffset);
+			l__headerBytes.position(l_stcoOffset+8);
+			int l__nbAudioChunks=l__headerBytes.getInt();
+			for(int i=0;i<l__nbAudioChunks;i++) {
+				int l__currentSize=l__headerBytes.getInt();
+				l__result.offsets.add(new MediaStreamOffset(StreamType.Audio,l__currentSize));
 			}
+		}*/
+		//System.out.println(l__nbVideoChunks+" - "+l__nbAudioChunks);
+		
+		// - sort offsets
+		Collections.sort(l__result.offsets, new Comparator<MediaStreamOffset>(){
+			public int compare(MediaStreamOffset l__val1, MediaStreamOffset l__val2) {
+				return (int)(l__val1.offset - l__val2.offset);
+			}
+		});
+
+		// Read Movie Header Atom
+		Pattern l__creationTimePattern = Pattern.compile("mvhd");
+		l__matcher = l__creationTimePattern.matcher(new ByteSequence(l__bufferArray));
+		if ( l__matcher.find() ) {
+			int l__mvhdOffset=l__matcher.start();
+			
+			// - get creation time
+			l__headerBytes.position(l__mvhdOffset+4);
+			l__result.creationTime=new Date((l__headerBytes.getLong() - 2082844800L) * 1000L);
+			
+			// - get duration
+			l__headerBytes.position(l__mvhdOffset+16);
+			int l__timeScale=l__headerBytes.getInt();
+			int l__duration=l__headerBytes.getInt();
+			l__result.duration=l__duration/l__timeScale;
+		}
 			
 		return l__result;
 	}
@@ -258,16 +271,24 @@ public class Video {
 			// Check if we are processing the good videos
 			// Note : there can be 1-2 seconds of difference...
 			if ( Math.abs(l__videoMP4.creationTime.getTime()- l__videoLRV.creationTime.getTime()) > 2000 ) {
-				System.out.println("The creation time of the MP4 and LRV videos doesn't match... Next !");
+				System.out.println("Warning : The creation time of the MP4 and LRV videos doesn't match... Next !");
 				return false;
 			}
 			
-			// Find the beginning of the MP4 video
+			// Get the offset of the MP4 video
 			long l__firstMP4Offset=0;
 			if (i__mediaTHM !=null )
 				l__firstMP4Offset=i__mediaTHM.offset+AMRT.FILESYSTEM_CLUSTER_SIZE+(l__videoMP4.offsets.get(0).offset %AMRT.FILESYSTEM_CLUSTER_SIZE);
 			else
 				l__firstMP4Offset=(i__mediaMP4.offset-l__videoLRV.dataSize-l__videoMP4.dataSize)+AMRT.FILESYSTEM_CLUSTER_SIZE+(l__videoMP4.offsets.get(0).offset %AMRT.FILESYSTEM_CLUSTER_SIZE);
+			
+			// Check that the offset is valid
+			if ( l__firstMP4Offset < 0 ) {
+				System.out.println("Error : The offset of the video is < 0 : "+l__firstMP4Offset);
+				return true;
+			}
+			
+			// Find the beginning of the MP4 video
 			while ( true ) {
 				// Compare
 				if ( isMediaPresent(i__stream, l__firstMP4Offset, StreamType.Video) ) {
