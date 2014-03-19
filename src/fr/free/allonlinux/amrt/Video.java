@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.Iterator;
 import java.util.TimeZone;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -202,32 +203,57 @@ public class Video {
 		return l__result;
 	}
 
-	public static void recover(FileChannel  i__stream, MediaOccurence i__video) throws IOException {
-		/*// Read the video information from the video
-		Video l__video=Video.readHeader(i__stream, i__video.offset,i__video.pattern);
-		System.out.println(l__video+"\n");
-		
-		// Create the output file
+	public static void recover(FileChannel  i__stream, MediaOccurence i__video) {
 		FileOutputStream l__outputFileStreamMP4=null;
-		FileChannel l__outputMP4=(l__outputFileStreamMP4=new FileOutputStream(AMRT.outputDirectory+"GOPRO_"+l__video.getCreationTime()+".MP4")).getChannel();
 		
-		// Calculate the estimate position of the video data
-		// Note : we decrease the offset by "l__video.headerSize" because the offset of the block is relative to the absolute file (=with the header)
-		long l__firstOffset=i__video.offset-l__video.dataSize-l__video.headerSize;
-		
-		// Check the content and write it in the output file
-		ArrayList<MediaStreamOffset> l__offsets=l__video.offsets;
-		for(Iterator<MediaStreamOffset> it=l__offsets.iterator();it.hasNext();) {
-			MediaStreamOffset l__item=it.next();
+		try {
+			// Read the video information from the video
+			Video l__video=Video.readHeader(i__stream, i__video.offset,i__video.pattern);
+			System.out.println(l__video+"\n");
 			
-			// Check that the pattern is at the good place
-			if ( ! Video.isMediaPresent(i__stream,l__firstOffset+l__item.offset,l__item.type) ) {
-				return;
+			// Create the output file
+			l__outputFileStreamMP4=new FileOutputStream(AMRT.outputDirectory+"GOPRO__"+l__video.getCreationTime()+".MP4");
+			FileChannel l__outputMP4=l__outputFileStreamMP4.getChannel();
+			
+			// Copy the header
+			i__stream.transferTo( i__video.offset,l__video.headerSize, l__outputMP4);
+			
+			// Calculate the estimate position of the video data
+			// Note : we decrease the offset by "l__video.headerSize" because the offset of the block is relative to the absolute file (=with the header)
+			long l__firstOffset=i__video.offset-l__video.dataSize-l__video.headerSize;
+			
+			VideoPlop l__videoPlop=new VideoPlop(l__video,l__outputMP4);
+			
+			// Write the header and data
+			ArrayList<MediaStreamOffset> l__offsets=l__video.offsets;
+			MediaStreamOffset l__previous=null;
+			for(Iterator<MediaStreamOffset> it=l__offsets.iterator();it.hasNext();) {
+				MediaStreamOffset l__current=it.next();
+				
+				// Check that the pattern is at the good place
+				if ( ! Video.isMediaPresent(i__stream,l__firstOffset+l__current.offset,l__current.type) ) {
+					return;
+				}
+				
+				// Copy the previous block
+				if ( l__previous != null ) {
+					i__stream.transferTo(l__firstOffset+l__previous.offset, l__current.offset-l__previous.offset, l__videoPlop.channel);
+				}
+				
+				l__previous=l__current;
 			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		} finally {
 			
-			// Copy to the output file
-			i__stream.transferTo(i__mediaTHM.offset, l__firstMP4Offset-i__mediaTHM.offset, l__outputMP4);
-		}*/
+			// Close output file streams
+			try {
+				if ( l__outputFileStreamMP4 != null )
+					l__outputFileStreamMP4.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
 	}
 	
 	static byte g__comparisonArray[]=new byte[Math.max(16,Math.max(VideoStreamPattern.length, AudioStreamPattern.length))];

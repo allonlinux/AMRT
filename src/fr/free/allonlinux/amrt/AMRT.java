@@ -145,10 +145,12 @@ public class AMRT {
 								(l__medias[i+1].pattern.codec == MediaCodec.MP4_mp42 || l__medias[i+1].pattern.codec == MediaCodec.MP4_avc1)  && 
 								(l__medias[i+2].pattern.codec == MediaCodec.MP4_mp42 || l__medias[i+2].pattern.codec == MediaCodec.MP4_avc1) ) {
 							boolean l__result=Video.recover(l__channel,l__medias[i],l__medias[i+1],l__medias[i+2]);
-							if (l__result)
+							if (l__result) {
 								i+=2;
-							else
+							} else {
 								i+=1;
+								Video.recover(l__channel,l__medias[i]);
+							}
 						}
 						break;
 					}
@@ -162,12 +164,15 @@ public class AMRT {
 								(l__medias[i].pattern.codec == MediaCodec.MP4_mp42 || l__medias[i].pattern.codec == MediaCodec.MP4_avc1)  && 
 								(l__medias[i+1].pattern.codec == MediaCodec.MP4_mp42 || l__medias[i+1].pattern.codec == MediaCodec.MP4_avc1) ) {
 							boolean l__result=Video.recover(l__channel, null,l__medias[i],l__medias[i+1]);
-							if (l__result)
+							if (l__result) {
 								i+=2;
-							else
+							} else {
 								i+=1;
+								Video.recover(l__channel,l__medias[i]);
+							}
+						} else {
+							Video.recover(l__channel,l__medias[i]);
 						}
-						//Video.recover(l__channel,l__medias[i]);
 						break;
 					}
 					
