@@ -14,7 +14,7 @@ public class VideoPlop {
 	long blockSize;						/** Block size */
 	
 
-	static final int MAX_SIZE_BLOCK_HEADERS=10;
+	static final int MAX_SIZE_BLOCK_HEADERS=6;
 	LinkedList<byte[]> previousBlockHeaders=new LinkedList<byte[]>();	/** Circular list with the last MAX_SIZE_BLOCK_HEADERS block headers  */
 	
 	public VideoPlop(Video i__video, FileChannel i__channel) {
@@ -29,7 +29,7 @@ public class VideoPlop {
 	 * not from the other video.
 	 * 
 	 * --> According to my experimentations, the first 16 bytes of the frame block are 
-	 * always common to the MP4 and LRV videos. And they are never the same for 10
+	 * always common to the MP4 and LRV videos. And they are never the same for 6
 	 * successive frames... Let's cross fingers that it is always true...
 	 * 
 	 * @param i__newBuffer
