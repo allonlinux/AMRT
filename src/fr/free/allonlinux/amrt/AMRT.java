@@ -19,6 +19,7 @@ import java.util.logging.Logger;
 public class AMRT {	
 	
 	public final static Logger LOG = Logger.getLogger(AMRT.class .getName());
+	public static Level logLevel =Level.INFO; 
 	
 	/** Cluster size, depending on the SD Card size :
 	 * - if size <= 32GB : 0x8000
@@ -44,15 +45,15 @@ public class AMRT {
 	}
 
 	public static void usage() {
-		AMRT.LOG.log(Level.FINE,"Usage :");
-		AMRT.LOG.log(Level.FINE,"\tjava -jar AMRT -inputFile=PATH [-outputDir=PATH] [-clusterSize=HEX_VALUE]");
-		AMRT.LOG.log(Level.FINE,"");
-		AMRT.LOG.log(Level.FINE,"-inputFile : PATH to the recovered image of you GoPro SD Card");
-		AMRT.LOG.log(Level.FINE,"-outputDir : PATH to the output directory where the recovered files will be saved");
-		AMRT.LOG.log(Level.FINE,"-clusterSize : cluster size in hex format (default='0x8000'). For SD Card > 32GB, use '0x20000' ");
-		AMRT.LOG.log(Level.FINE,"");
-		AMRT.LOG.log(Level.FINE,"Note : requires a version of Java >= 1.6");
-		AMRT.LOG.log(Level.FINE,"");
+		AMRT.LOG.log(Level.ALL,"Usage :");
+		AMRT.LOG.log(Level.ALL,"\tjava -jar AMRT -inputFile=PATH [-outputDir=PATH] [-clusterSize=HEX_VALUE]");
+		AMRT.LOG.log(Level.ALL,"");
+		AMRT.LOG.log(Level.ALL,"-inputFile : PATH to the recovered image of you GoPro SD Card");
+		AMRT.LOG.log(Level.ALL,"-outputDir : PATH to the output directory where the recovered files will be saved");
+		AMRT.LOG.log(Level.ALL,"-clusterSize : cluster size in hex format (default='0x8000'). For SD Card > 32GB, use '0x20000' ");
+		AMRT.LOG.log(Level.ALL,"");
+		AMRT.LOG.log(Level.ALL,"Note : requires a version of Java >= 1.6");
+		AMRT.LOG.log(Level.ALL,"");
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -86,6 +87,16 @@ public class AMRT {
 				FILESYSTEM_CLUSTER_SIZE=Integer.decode(l__param.substring("-clusterSize=".length()));
 			}
 			
+			else if ( l__param.startsWith("-logLevel=") ) {
+				String l__paramValue=l__param.substring("-logLevel=".length());
+				if ( l__paramValue.equals("debug") )
+					logLevel=Level.SEVERE;
+				if ( l__paramValue.equals("info") )
+					logLevel=Level.INFO;
+				if ( l__paramValue.equals("warning") )
+					logLevel=Level.WARNING;
+			}
+			
 			else {
 				LOG.log(Level.SEVERE,"Invalid option");
 				usage();
@@ -99,7 +110,7 @@ public class AMRT {
 
 		// Set log configuration
 		LogManager.getLogManager().reset();
-		LOG.setLevel(Level.INFO);
+		LOG.setLevel(logLevel);
 		Handler l__handler=new ConsoleHandler();
 		l__handler.setFormatter(new LogFormatter());
 		LOG.addHandler(l__handler);

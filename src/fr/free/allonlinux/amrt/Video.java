@@ -208,10 +208,11 @@ public class Video {
 		AMRT.LOG.log(Level.INFO,"\n\n##### Recover video with Protune 'ON' (MP4) #####");
 		
 		FileOutputStream l__outputFileStreamMP4=null;
+		Video l__video=null;
 		
 		try {
 			// Read the video information from the video
-			Video l__video=Video.readHeader(i__stream, i__video.offset,i__video.pattern);
+			l__video=Video.readHeader(i__stream, i__video.offset,i__video.pattern);
 			AMRT.LOG.log(Level.INFO,l__video+"\n");
 			
 			// Create the output file
@@ -262,8 +263,17 @@ public class Video {
 			
 			// Close output file streams
 			try {
-				if ( l__outputFileStreamMP4 != null )
+				if ( l__outputFileStreamMP4 != null ) {
+					// Print report
+					long l__percentage=(100*l__outputFileStreamMP4.getChannel().size())/(l__video.headerSize+l__video.dataSize);
+					if (l__percentage > 100)
+						l__percentage=100;
+					if (l__percentage < 0)
+						l__percentage=0;
+					AMRT.LOG.log(Level.INFO,"Recovery percentage : "+l__percentage);
+					
 					l__outputFileStreamMP4.close();
+				}
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
