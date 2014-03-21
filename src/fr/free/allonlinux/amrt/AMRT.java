@@ -90,7 +90,7 @@ public class AMRT {
 			else if ( l__param.startsWith("-logLevel=") ) {
 				String l__paramValue=l__param.substring("-logLevel=".length());
 				if ( l__paramValue.equals("debug") )
-					logLevel=Level.SEVERE;
+					logLevel=Level.FINE;
 				if ( l__paramValue.equals("info") )
 					logLevel=Level.INFO;
 				if ( l__paramValue.equals("warning") )
@@ -110,9 +110,10 @@ public class AMRT {
 
 		// Set log configuration
 		LogManager.getLogManager().reset();
-		LOG.setLevel(logLevel);
 		Handler l__handler=new ConsoleHandler();
+		l__handler.setLevel(logLevel);
 		l__handler.setFormatter(new LogFormatter());
+		LOG.setLevel(logLevel);
 		LOG.addHandler(l__handler);
 		
 		// If the input file is not specified, exit

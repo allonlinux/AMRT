@@ -105,7 +105,7 @@ public class Video {
 			AMRT.LOG.log(Level.WARNING,"The header size should be a factor of the cluster size : "+l__result.headerSize);
 			l__result.headerSize=((l__result.headerSize / AMRT.FILESYSTEM_CLUSTER_SIZE)+1) * AMRT.FILESYSTEM_CLUSTER_SIZE;
 		}
-		AMRT.LOG.log(Level.FINE,"Header size : %x\n",l__result.headerSize);
+		AMRT.LOG.log(Level.FINE,"Header size : %x",l__result.headerSize);
 		
 		// Get the video size : 
 		// -> 2 bytes at position 0x0270 (width) and 0x0274 (height)
@@ -213,7 +213,7 @@ public class Video {
 		try {
 			// Read the video information from the video
 			l__video=Video.readHeader(i__stream, i__video.offset,i__video.pattern);
-			AMRT.LOG.log(Level.INFO,l__video+"\n");
+			AMRT.LOG.log(Level.INFO,l__video.toString());
 			
 			// Create the output file
 			l__outputFileStreamMP4=new FileOutputStream(AMRT.outputDirectory+"GOPRO__"+l__video.getCreationTime()+".MP4");
@@ -327,8 +327,8 @@ public class Video {
 			}
 			
 			// Print information
-			AMRT.LOG.log(Level.INFO,l__videoMP4+"\n");
-			AMRT.LOG.log(Level.INFO,l__videoLRV+"\n");
+			AMRT.LOG.log(Level.INFO,l__videoMP4.toString());
+			AMRT.LOG.log(Level.INFO,l__videoLRV.toString());
 			
 			// Get the offset of the MP4 video
 			long l__firstMP4Offset=0;
@@ -358,7 +358,7 @@ public class Video {
 					return false;
 				}		
 			}
-			AMRT.LOG.log(Level.FINE,"First offset of the video found at position : %x\n",l__firstMP4Offset);
+			AMRT.LOG.log(Level.FINE,"First offset of the video found at position : %x",l__firstMP4Offset);
 			
 	
 			// Create output files
@@ -400,7 +400,7 @@ public class Video {
 				
 				// If next block is found
 				if ( l__isPresent ) {
-					AMRT.LOG.log(Level.FINE,"Offset of the next block stream found at position : %x\n",l__current.blockOffset+l__current.blockSize);
+					AMRT.LOG.log(Level.FINEST,"Offset of the next block stream found at position : %x",l__current.blockOffset+l__current.blockSize);
 					
 					// Copy to the output file
 					try {

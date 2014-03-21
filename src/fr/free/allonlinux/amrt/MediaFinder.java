@@ -78,7 +78,7 @@ public class MediaFinder {
 				int l__offset=findPattern(l__media.pattern,array,0,MAX_HEADER_FIND_SIZE);
 				// If a media is found...
 				if (l__offset >= 0 ) {
-					AMRT.LOG.log(Level.INFO,"Media found : '%s - %s' at position 0x%x\n",new Object[]{l__media.type, l__media.codec,(l__currentOffset+l__offset)});
+					AMRT.LOG.log(Level.INFO,"Media found : '%s - %s' at position 0x%x",new Object[]{l__media.type, l__media.codec,(l__currentOffset+l__offset)});
 					// ... add it to the output list
 					l__result.add(new MediaOccurence(l__currentOffset, l__media));
 				}
