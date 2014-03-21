@@ -11,6 +11,7 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.TimeZone;
+import java.util.logging.Level;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -101,10 +102,10 @@ public class Video {
 		l__result.headerSize+=8;
 		// Header size is modulo 'FILESYSTEM_CLUSTER_SIZE'
 		if ( (l__result.headerSize % AMRT.FILESYSTEM_CLUSTER_SIZE) != 0) {
-			System.out.println("Warning : the header size should be a factor of the cluster size : "+l__result.headerSize);
+			AMRT.LOG.log(Level.WARNING,"The header size should be a factor of the cluster size : "+l__result.headerSize);
 			l__result.headerSize=((l__result.headerSize / AMRT.FILESYSTEM_CLUSTER_SIZE)+1) * AMRT.FILESYSTEM_CLUSTER_SIZE;
 		}
-		//System.out.printf("Header size : %x\n",l__result.headerSize);
+		AMRT.LOG.log(Level.FINE,"Header size : %x\n",l__result.headerSize);
 		
 		// Get the video size : 
 		// -> 2 bytes at position 0x0270 (width) and 0x0274 (height)
@@ -114,7 +115,7 @@ public class Video {
 		i__stream.position(i__headerOffset+0x274);l__2Bytes.rewind();
 		l__2Bytes.clear();i__stream.read(l__2Bytes);l__2Bytes.rewind();
 		l__result.videoHeight=l__2Bytes.getShort();
-		//System.out.println(l__result.videoWidth+"x"+l__result.videoHeight);
+		AMRT.LOG.log(Level.FINE,l__result.videoWidth+"x"+l__result.videoHeight);
 		
 		// Check that the header is valid by ckecking if the last 4 bytes are 'mdat'
 		i__stream.position(i__headerOffset+l__result.headerSize-4);
@@ -152,7 +153,7 @@ public class Video {
 		// - 1st occurence (video)
 		if (l__matcher.find() ) {
 			int l_stcoOffset=l__matcher.start();
-			//System.out.println("Offset :- "+l_stcoOffset);
+			//AMRT.LOG.log(Level.INFO,"Offset :- "+l_stcoOffset);
 			l__headerBytes.position(l_stcoOffset+8);
 			int l__nbVideoChunks=l__headerBytes.getInt();
 			for(int i=0;i<l__nbVideoChunks;i++) {
@@ -166,7 +167,7 @@ public class Video {
 		// - 2nd occurence (audio)
 		/*if (l__matcher.find() ) {
 			int l_stcoOffset=l__matcher.start();
-			//System.out.println("Offset :- "+l_stcoOffset);
+			//AMRT.LOG.log(Level.INFO,"Offset :- "+l_stcoOffset);
 			l__headerBytes.position(l_stcoOffset+8);
 			int l__nbAudioChunks=l__headerBytes.getInt();
 			for(int i=0;i<l__nbAudioChunks;i++) {
@@ -174,7 +175,7 @@ public class Video {
 				l__result.offsets.add(new MediaStreamOffset(StreamType.Audio,l__currentSize));
 			}
 		}*/
-		//System.out.println(l__nbVideoChunks+" - "+l__nbAudioChunks);
+		//AMRT.LOG.log(Level.INFO,l__nbVideoChunks+" - "+l__nbAudioChunks);
 		
 		// - sort offsets
 		Collections.sort(l__result.offsets, new Comparator<MediaStreamOffset>(){
@@ -204,12 +205,14 @@ public class Video {
 	}
 
 	public static void recover(FileChannel  i__stream, MediaOccurence i__video) {
+		AMRT.LOG.log(Level.INFO,"\n\n##### Recover video with Protune 'ON' (MP4) #####");
+		
 		FileOutputStream l__outputFileStreamMP4=null;
 		
 		try {
 			// Read the video information from the video
 			Video l__video=Video.readHeader(i__stream, i__video.offset,i__video.pattern);
-			System.out.println(l__video+"\n");
+			AMRT.LOG.log(Level.INFO,l__video+"\n");
 			
 			// Create the output file
 			l__outputFileStreamMP4=new FileOutputStream(AMRT.outputDirectory+"GOPRO__"+l__video.getCreationTime()+".MP4");
@@ -235,13 +238,24 @@ public class Video {
 					return;
 				}
 				
+				// Depending on the camera, there is sometimes some data between the end of the header and the very first chunk...
+				if ( l__previous == null ) {
+					AMRT.LOG.log(Level.INFO,"Copy preliminary data = "+(l__current.offset%AMRT.FILESYSTEM_CLUSTER_SIZE)+" at "+(l__firstOffset+l__video.headerSize));
+					i__stream.transferTo(l__firstOffset+l__video.headerSize, l__current.offset%AMRT.FILESYSTEM_CLUSTER_SIZE, l__videoPlop.channel);
+				}
 				// Copy the previous block
-				if ( l__previous != null ) {
+				else {
 					i__stream.transferTo(l__firstOffset+l__previous.offset, l__current.offset-l__previous.offset, l__videoPlop.channel);
 				}
 				
 				l__previous=l__current;
 			}
+			
+			AMRT.LOG.log(Level.FINE,"Output file size = "+l__outputMP4.size());
+			AMRT.LOG.log(Level.FINE,"Header offset = "+i__video.offset);
+			AMRT.LOG.log(Level.FINE,"Virtual header offset = "+l__firstOffset);
+			AMRT.LOG.log(Level.FINE,"First data offset = "+l__video.offsets.get(0).offset);
+			AMRT.LOG.log(Level.FINE,"Last data offset = "+l__video.offsets.get(l__video.offsets.size()-1).offset);
 		} catch (Exception e) {
 			e.printStackTrace();
 		} finally {
@@ -282,24 +296,29 @@ public class Video {
 	}
 	
 	public static boolean recover(FileChannel  i__stream, MediaOccurence i__mediaTHM, MediaOccurence i__mediaMP4, MediaOccurence i__mediaLRV) {
+		AMRT.LOG.log(Level.INFO,"\n##### Recover video with Protune 'OFF' (THM/MP4/LRV) #####\n");
+		
 		FileOutputStream l__outputFileStreamMP4=null;
 		FileOutputStream l__outputFileStreamLRV=null;
 		
+		Video l__videoMP4=null;
+		Video l__videoLRV=null;
+		
 		try {
 			// Read the video information from both videos
-			Video l__videoMP4=Video.readHeader(i__stream, i__mediaMP4.offset,i__mediaMP4.pattern);
-			Video l__videoLRV=Video.readHeader(i__stream, i__mediaLRV.offset,i__mediaLRV.pattern);
-			
-			// Print information
-			System.out.println(l__videoMP4+"\n");
-			System.out.println(l__videoLRV+"\n");
+			l__videoMP4=Video.readHeader(i__stream, i__mediaMP4.offset,i__mediaMP4.pattern);
+			l__videoLRV=Video.readHeader(i__stream, i__mediaLRV.offset,i__mediaLRV.pattern);
 			
 			// Check if we are processing the good videos
 			// Note : there can be 1-2 seconds of difference...
 			if ( Math.abs(l__videoMP4.creationTime.getTime()- l__videoLRV.creationTime.getTime()) > 2000 ) {
-				System.out.println("Warning : The creation time of the MP4 and LRV videos doesn't match... Next !");
+				AMRT.LOG.log(Level.WARNING,"The creation time of the MP4 and LRV videos doesn't match... Next ! "+l__videoMP4.getCreationTime()+" - "+l__videoLRV.getCreationTime());
 				return false;
 			}
+			
+			// Print information
+			AMRT.LOG.log(Level.INFO,l__videoMP4+"\n");
+			AMRT.LOG.log(Level.INFO,l__videoLRV+"\n");
 			
 			// Get the offset of the MP4 video
 			long l__firstMP4Offset=0;
@@ -310,7 +329,7 @@ public class Video {
 			
 			// Check that the offset is valid
 			if ( l__firstMP4Offset < 0 ) {
-				System.out.println("Error : The offset of the video is < 0 : "+l__firstMP4Offset);
+				AMRT.LOG.log(Level.SEVERE,"The offset of the video is < 0 : "+l__firstMP4Offset);
 				return true;
 			}
 			
@@ -325,11 +344,11 @@ public class Video {
 				
 				// Check we are not going too far...
 				if ( l__firstMP4Offset>= i__mediaMP4.offset ) {
-					System.out.println("Error : could not find the first offset of the video");
+					AMRT.LOG.log(Level.SEVERE,"Could not find the first offset of the video");
 					return false;
 				}		
 			}
-			System.out.printf("First offset of the video found at position : %x\n",l__firstMP4Offset);
+			AMRT.LOG.log(Level.FINE,"First offset of the video found at position : %x\n",l__firstMP4Offset);
 			
 	
 			// Create output files
@@ -353,7 +372,6 @@ public class Video {
 			
 			// Write THM file
 			if (i__mediaTHM !=null ) {
-				//	System.out.printf("From %x To %x\n",i__thm.offset,l__currentBigVideoOffset-i__thm.offset);
 				i__stream.transferTo( i__mediaTHM.offset, l__firstMP4Offset-i__mediaTHM.offset, l__outputTHM);
 				l__outputTHM.close();
 			}
@@ -372,7 +390,7 @@ public class Video {
 				
 				// If next block is found
 				if ( l__isPresent ) {
-					//System.out.printf("Offset of the next block stream found at position : %x\n",l__current.blockOffset+l__current.blockSize);
+					AMRT.LOG.log(Level.FINE,"Offset of the next block stream found at position : %x\n",l__current.blockOffset+l__current.blockSize);
 					
 					// Copy to the output file
 					try {
@@ -384,7 +402,7 @@ public class Video {
 					// Check if it was the last block
 					if ( l__current.blockIndex+2 >= l__current.video.offsets.size() ) {
 						if ( l__other == null ) {
-							System.out.println("The END !!!");
+							AMRT.LOG.log(Level.INFO,"The END !!!");
 							break; // <--- THE END
 						} else {
 							l__current=l__other;
@@ -398,7 +416,7 @@ public class Video {
 					l__current.blockOffset+=l__current.blockSize;
 					l__current.blockSize=l__current.video.offsets.get(l__current.blockIndex+1).offset-l__current.video.offsets.get(l__current.blockIndex).offset;
 					if (l__current.blockSize <= 0) {
-						System.out.println("Error : bad block size");
+						AMRT.LOG.log(Level.SEVERE,"Bad block size");
 						return true;
 					}
 				} 
@@ -432,7 +450,7 @@ public class Video {
 							
 							// But before, check that we are not going too far...
 							if ( l__currentOffset >= i__mediaMP4.offset ) {
-								System.out.println("Error : could not find the offset of the video");
+								AMRT.LOG.log(Level.SEVERE,"Could not find the offset of the video");
 								return true;
 							}	
 						}	
@@ -450,7 +468,7 @@ public class Video {
 						if ( l__current.video.offsets.get(l__current.blockIndex+1).type == StreamType.Video && l__remainingSize < VideoStreamPattern.length ||
 								l__current.video.offsets.get(l__current.blockIndex+1).type == StreamType.Audio && l__remainingSize < AudioStreamPattern.length  )
 						{
-							System.out.println("Information : next block pattern on two clusters separated by the other video");
+							AMRT.LOG.log(Level.INFO,"Next block pattern on two clusters separated by the other video");
 							
 							// Increment the 'blockIndex' because we found the next block !
 							l__current.blockIndex++;
@@ -459,7 +477,7 @@ public class Video {
 							l__current.blockSize=l__current.video.offsets.get(l__current.blockIndex+1).offset-l__current.video.offsets.get(l__current.blockIndex).offset-l__remainingSize;
 							l__current.blockOffset=0;
 						} else {
-							System.out.println("Error : bad block size : "+l__current.blockSize+"/"+l__currentOffset+"/"+l__current.blockOffset);
+							AMRT.LOG.log(Level.SEVERE,"Bad block size : "+l__current.blockSize+"/"+l__currentOffset+"/"+l__current.blockOffset);
 							return true;
 						}
 					} else {
@@ -474,7 +492,7 @@ public class Video {
 					if ( l__other.blockIndex == 0 ) {
 						l__other.blockSize = l__other.video.offsets.get(1).offset-l__other.video.offsets.get(0).offset;
 						if (l__other.blockSize <= 0) {
-							System.out.println("Error : bad block size : "+l__other.blockSize);
+							AMRT.LOG.log(Level.SEVERE,"Bad block size : "+l__other.blockSize);
 							return true;
 						}
 						l__other.blockIndex=0;
@@ -487,18 +505,23 @@ public class Video {
 				}
 			}
 			
-			// Close channels
-			l__outputMP4.close();
-			l__outputLRV.close();
 		} catch (Exception e) {
 			e.printStackTrace();
 			return false;
 		} finally {
-			
 			// Close output file streams
 			try {
-				if ( l__outputFileStreamMP4 != null )
+				if ( l__outputFileStreamMP4 != null ) {	
+					// Print report
+					long l__percentage=(100*l__outputFileStreamMP4.getChannel().size())/(l__videoMP4.headerSize+l__videoMP4.dataSize);
+					if (l__percentage > 100)
+						l__percentage=100;
+					if (l__percentage < 0)
+						l__percentage=0;
+					AMRT.LOG.log(Level.INFO,"Recovery percentage : "+l__percentage);
+					
 					l__outputFileStreamMP4.close();
+				}
 				if ( l__outputFileStreamLRV != null )
 					l__outputFileStreamLRV.close();
 			} catch (IOException e) {

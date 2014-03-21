@@ -9,8 +9,16 @@ import java.io.ObjectOutputStream;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
+import java.util.logging.ConsoleHandler;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.LogManager;
+import java.util.logging.Logger;
 
-public class AMRT {
+
+public class AMRT {	
+	
+	public final static Logger LOG = Logger.getLogger(AMRT.class .getName());
 	
 	/** Cluster size, depending on the SD Card size :
 	 * - if size <= 32GB : 0x8000
@@ -29,22 +37,22 @@ public class AMRT {
 	 */
 	public static void createMediaHeaders() {
 		headers=new MediaPattern[4];
-		headers[0]=new MediaPattern(MediaType.Video,	MediaCodec.MP4_mp42, 	"\\x00\\x00\\x00\\x20\\x66\\x74\\x79\\x70\\x6D\\x70\\x34\\x32\\x00\\x00\\x00\\x00");
+		headers[0]=new MediaPattern(MediaType.Video,	MediaCodec.MP4_mp42,	"\\x00\\x00\\x00\\x20\\x66\\x74\\x79\\x70\\x6D\\x70\\x34\\x32\\x00\\x00\\x00\\x00");
 		headers[1]=new MediaPattern(MediaType.Video,	MediaCodec.MP4_avc1,		"\\x00\\x00\\x00\\x20\\x66\\x74\\x79\\x70\\x61\\x76\\x63\\x31\\x00\\x00\\x00\\x00");
-		headers[2]=new MediaPattern(MediaType.Image,	MediaCodec.THM,				"\\xFF\\xD8\\xFF\\xE0\\x00\\x10\\x4A\\x46\\x49\\x46");
-		headers[3]=new MediaPattern(MediaType.Image,	MediaCodec.JPEG,				"\\xFF\\xD8\\xFF\\xE1..\\x45\\x78\\x69\\x66\\x00\\x00\\x4D\\x4D\\x00\\x2A");
+		headers[2]=new MediaPattern(MediaType.Image,	MediaCodec.THM,			"\\xFF\\xD8\\xFF\\xE0\\x00\\x10\\x4A\\x46\\x49\\x46");
+		headers[3]=new MediaPattern(MediaType.Image,	MediaCodec.JPEG,			"\\xFF\\xD8\\xFF\\xE1..\\x45\\x78\\x69\\x66\\x00\\x00\\x4D\\x4D\\x00\\x2A");
 	}
 
 	public static void usage() {
-		System.out.println("Usage :");
-		System.out.println("\tjava -jar AMRT -inputFile=PATH [-outputDir=PATH] [-clusterSize=HEX_VALUE]");
-		System.out.println("");
-		System.out.println("-inputFile : PATH to the recovered image of you GoPro SD Card");
-		System.out.println("-outputDir : PATH to the output directory where the recovered files will be saved");
-		System.out.println("-clusterSize : cluster size in hex format (default='0x8000'). For SD Card > 32GB, use '0x20000' ");
-		System.out.println("");
-		System.out.println("Note : requires a version of Java >= 1.6");
-		System.out.println("");
+		AMRT.LOG.log(Level.FINE,"Usage :");
+		AMRT.LOG.log(Level.FINE,"\tjava -jar AMRT -inputFile=PATH [-outputDir=PATH] [-clusterSize=HEX_VALUE]");
+		AMRT.LOG.log(Level.FINE,"");
+		AMRT.LOG.log(Level.FINE,"-inputFile : PATH to the recovered image of you GoPro SD Card");
+		AMRT.LOG.log(Level.FINE,"-outputDir : PATH to the output directory where the recovered files will be saved");
+		AMRT.LOG.log(Level.FINE,"-clusterSize : cluster size in hex format (default='0x8000'). For SD Card > 32GB, use '0x20000' ");
+		AMRT.LOG.log(Level.FINE,"");
+		AMRT.LOG.log(Level.FINE,"Note : requires a version of Java >= 1.6");
+		AMRT.LOG.log(Level.FINE,"");
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -69,7 +77,7 @@ public class AMRT {
 			else if ( l__param.startsWith("-outputDir=") ) {
 				outputDirectory=l__param.substring("-outputDir=".length());
 				if ( ! (new File(outputDirectory)).isDirectory()) {
-					System.out.println("The output directory you specified doesn't exist : '"+outputDirectory+"'");
+					LOG.log(Level.SEVERE,"The output directory you specified doesn't exist : '"+outputDirectory+"'");
 					return;
 				}
 			}
@@ -79,7 +87,7 @@ public class AMRT {
 			}
 			
 			else {
-				System.out.println("Invalid option");
+				LOG.log(Level.SEVERE,"Invalid option");
 				usage();
 				return;
 			}
@@ -88,18 +96,26 @@ public class AMRT {
 		}
 		outputDirectory+="/";
 		
+
+		// Set log configuration
+		LogManager.getLogManager().reset();
+		LOG.setLevel(Level.INFO);
+		Handler l__handler=new ConsoleHandler();
+		l__handler.setFormatter(new LogFormatter());
+		LOG.addHandler(l__handler);
+		
 		// If the input file is not specified, exit
 		if (l__inputFile == null) {
-			System.out.println("You must specify the input file to process");
+			LOG.log(Level.SEVERE,"You must specify the input file to process");
 			return;
 		}
 		
 		// Print the parameters that will be used
-		System.out.println("Parameters :");
-		System.out.println("- input file : "+l__inputFile);
-		System.out.println("- output directory : "+outputDirectory);
-		System.out.printf("- cluster size : %x\n",FILESYSTEM_CLUSTER_SIZE);
-		System.out.println("\n");
+		LOG.log(Level.INFO,"Parameters :");
+		LOG.log(Level.INFO,"- input file : "+l__inputFile);
+		LOG.log(Level.INFO,"- output directory : "+outputDirectory);
+		LOG.log(Level.INFO,"- cluster size : %x",FILESYSTEM_CLUSTER_SIZE);
+		LOG.log(Level.INFO,"\n");
 		
 		// Create the list of medias to search given their binary header
 		createMediaHeaders();
@@ -147,9 +163,6 @@ public class AMRT {
 							boolean l__result=Video.recover(l__channel,l__medias[i],l__medias[i+1],l__medias[i+2]);
 							if (l__result) {
 								i+=2;
-							} else {
-								i+=1;
-								Video.recover(l__channel,l__medias[i]);
 							}
 						}
 						break;
@@ -165,9 +178,8 @@ public class AMRT {
 								(l__medias[i+1].pattern.codec == MediaCodec.MP4_mp42 || l__medias[i+1].pattern.codec == MediaCodec.MP4_avc1) ) {
 							boolean l__result=Video.recover(l__channel, null,l__medias[i],l__medias[i+1]);
 							if (l__result) {
-								i+=2;
-							} else {
 								i+=1;
+							} else {
 								Video.recover(l__channel,l__medias[i]);
 							}
 						} else {
@@ -178,7 +190,7 @@ public class AMRT {
 					
 					default:
 					{
-						System.out.println("Media not handled yet... '"+l__codec+"'");
+						LOG.log(Level.INFO,"Media not handled yet... '"+l__codec+"'");
 					}
 				}
 			}

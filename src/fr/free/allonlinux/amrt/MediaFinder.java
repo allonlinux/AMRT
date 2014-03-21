@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
+import java.util.logging.Level;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -23,14 +24,14 @@ public class MediaFinder {
 	 */
 	static int findPattern(Pattern i__pattern, byte i__buffer[], int i__start, int i__end) {
 		// Create Matcher
-        Matcher l__matcher = i__pattern.matcher(new ByteSequence(i__buffer));
-        // Set search region
-        l__matcher.region(i__start, i__end);
-        // Search
-        if ( l__matcher.find() ) {
-        	return l__matcher.start();
-        }
-        return -1;
+		Matcher l__matcher = i__pattern.matcher(new ByteSequence(i__buffer));
+		// Set search region
+		l__matcher.region(i__start, i__end);
+		// Search
+		if ( l__matcher.find() ) {
+			return l__matcher.start();
+		}
+		return -1;
 	}
 	
 	/**
@@ -66,35 +67,35 @@ public class MediaFinder {
 		i__stream.position(l__currentOffset);
 		
 		// Read the file block by block
-        while( i__stream.read(l__buffer) > 0 )
-        {
-        	// For each block, try to find a media header
-        	for ( int i=0;i<AMRT.headers.length;i++) {
-        		// Current media to find
-        		MediaPattern l__media=AMRT.headers[i];
-        		// Find the media, thanks to its pattern
-        		// Only the first MAX_HEADER_FIND_SIZE bytes are really used
-        		int l__offset=findPattern(l__media.pattern,array,0,MAX_HEADER_FIND_SIZE);
-        		// If a media is found...
-        		if (l__offset >= 0 ) {
-        			System.out.printf("Media found : '%s - %s' at position 0x%x\n",l__media.type, l__media.codec,(l__currentOffset+l__offset));
-        			// ... add it to the output list
-        			l__result.add(new MediaOccurence(l__currentOffset, l__media));
-        		}
-        	}
-        	
-        	// Clear buffer
-        	l__buffer.clear();
-            
-            // Move to the next cluster
-        	l__currentOffset+=AMRT.FILESYSTEM_CLUSTER_SIZE;
-        	i__stream.position(l__currentOffset);
-            
-            if ( l__currentOffset  >= i__end )
-            	break;
-        }
+		while( i__stream.read(l__buffer) > 0 )
+		{
+			// For each block, try to find a media header
+			for ( int i=0;i<AMRT.headers.length;i++) {
+				// Current media to find
+				MediaPattern l__media=AMRT.headers[i];
+				// Find the media, thanks to its pattern
+				// Only the first MAX_HEADER_FIND_SIZE bytes are really used
+				int l__offset=findPattern(l__media.pattern,array,0,MAX_HEADER_FIND_SIZE);
+				// If a media is found...
+				if (l__offset >= 0 ) {
+					AMRT.LOG.log(Level.INFO,"Media found : '%s - %s' at position 0x%x\n",new Object[]{l__media.type, l__media.codec,(l__currentOffset+l__offset)});
+					// ... add it to the output list
+					l__result.add(new MediaOccurence(l__currentOffset, l__media));
+				}
+			}
+			
+			// Clear buffer
+			l__buffer.clear();
+			
+			// Move to the next cluster
+			l__currentOffset+=AMRT.FILESYSTEM_CLUSTER_SIZE;
+			i__stream.position(l__currentOffset);
+			
+			if ( l__currentOffset  >= i__end )
+				break;
+		}
 		
-        return l__result;
+		return l__result;
 	}
 	
 	/**

@@ -3,6 +3,7 @@ package fr.free.allonlinux.amrt;
 import java.nio.channels.FileChannel;
 import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.logging.Level;
 
 public class VideoPlop {
 
@@ -49,7 +50,7 @@ public class VideoPlop {
 			}
 			
 			if (l__found) {
-				System.out.println("Information : prevented an offset overlapping");
+				AMRT.LOG.log(Level.WARNING,"Prevented an offset overlapping");
 				return false;
 			}
 		}
