@@ -105,7 +105,6 @@ public class Video {
 			AMRT.LOG.log(Level.WARNING,"The header size should be a factor of the cluster size : "+l__result.headerSize);
 			l__result.headerSize=((l__result.headerSize / AMRT.FILESYSTEM_CLUSTER_SIZE)+1) * AMRT.FILESYSTEM_CLUSTER_SIZE;
 		}
-		AMRT.LOG.log(Level.FINE,"Header size : %x",l__result.headerSize);
 		
 		// Get the video size : 
 		// -> 2 bytes at position 0x0270 (width) and 0x0274 (height)
@@ -115,7 +114,6 @@ public class Video {
 		i__stream.position(i__headerOffset+0x274);l__2Bytes.rewind();
 		l__2Bytes.clear();i__stream.read(l__2Bytes);l__2Bytes.rewind();
 		l__result.videoHeight=l__2Bytes.getShort();
-		AMRT.LOG.log(Level.FINE,l__result.videoWidth+"x"+l__result.videoHeight);
 		
 		// Check that the header is valid by ckecking if the last 4 bytes are 'mdat'
 		i__stream.position(i__headerOffset+l__result.headerSize-4);
@@ -206,6 +204,7 @@ public class Video {
 
 	public static void recover(FileChannel  i__stream, MediaOccurence i__video) {
 		AMRT.LOG.log(Level.INFO,"\n\n##### Recover video with Protune 'ON' (MP4) #####");
+		AMRT.LOG.log(Level.INFO,"MP4 @ 0x%x\n",i__video.offset);
 		
 		FileOutputStream l__outputFileStreamMP4=null;
 		Video l__video=null;
@@ -226,6 +225,29 @@ public class Video {
 			// Note : we decrease the offset by "l__video.headerSize" because the offset of the block is relative to the absolute file (=with the header)
 			long l__firstOffset=i__video.offset-l__video.dataSize-l__video.headerSize;
 			
+			// It seems that, sometimes, there is a small gap of empty clusters between the data and the header.
+			// Because of that, we must go backward a little bit to be sure to get the beginning of the data...
+			l__firstOffset-=5*AMRT.FILESYSTEM_CLUSTER_SIZE;
+			if (l__firstOffset < -AMRT.FILESYSTEM_CLUSTER_SIZE)
+				l__firstOffset= -AMRT.FILESYSTEM_CLUSTER_SIZE;
+			
+			// Find the beginning of the MP4 video
+			while ( true ) {
+				// Compare
+				if ( isMediaPresent(i__stream, l__firstOffset+l__video.offsets.get(0).offset, StreamType.Video) ) {
+					break;
+				} else {
+					l__firstOffset+=AMRT.FILESYSTEM_CLUSTER_SIZE;
+				}
+				
+				// Check we are not going too far...
+				if ( l__firstOffset>= i__video.offset ) {
+					AMRT.LOG.log(Level.SEVERE,"Could not find the first offset of the video");
+					return;
+				}		
+			}
+			AMRT.LOG.log(Level.FINE,"First offset of the video found at position : 0x%x",l__firstOffset);
+			
 			VideoPlop l__videoPlop=new VideoPlop(l__video,l__outputMP4);
 			
 			// Write the header and data
@@ -236,6 +258,7 @@ public class Video {
 				
 				// Check that the pattern is at the good place
 				if ( ! Video.isMediaPresent(i__stream,l__firstOffset+l__current.offset,l__current.type) ) {
+					AMRT.LOG.log(Level.SEVERE,"Couldn't find the pattern !");
 					return;
 				}
 				
@@ -307,6 +330,13 @@ public class Video {
 	
 	public static boolean recover(FileChannel  i__stream, MediaOccurence i__mediaTHM, MediaOccurence i__mediaMP4, MediaOccurence i__mediaLRV) {
 		AMRT.LOG.log(Level.INFO,"\n##### Recover video with Protune 'OFF' (THM/MP4/LRV) #####\n");
+		if ( i__mediaTHM != null )
+			AMRT.LOG.log(Level.INFO,"THM @ 0x%x",i__mediaTHM.offset);
+		if ( i__mediaMP4 != null )
+			AMRT.LOG.log(Level.INFO,"MP4 @ 0x%x",i__mediaMP4.offset);
+		if ( i__mediaLRV != null )
+			AMRT.LOG.log(Level.INFO,"LRV @ 0x%x",i__mediaLRV.offset);
+		AMRT.LOG.log(Level.INFO,"\n");
 		
 		FileOutputStream l__outputFileStreamMP4=null;
 		FileOutputStream l__outputFileStreamLRV=null;
@@ -337,6 +367,10 @@ public class Video {
 			else
 				l__firstMP4Offset=(i__mediaMP4.offset-l__videoLRV.dataSize-l__videoMP4.dataSize)+AMRT.FILESYSTEM_CLUSTER_SIZE+(l__videoMP4.offsets.get(0).offset %AMRT.FILESYSTEM_CLUSTER_SIZE);
 			
+			// It seems that, sometimes, there is a small gap of empty clusters between the data and the header.
+			// Because of that, we must go backward a little bit to be sure to get the beginning of the data...
+			l__firstMP4Offset-=5*AMRT.FILESYSTEM_CLUSTER_SIZE;
+			
 			// Check that the offset is valid
 			if ( l__firstMP4Offset < 0 ) {
 				AMRT.LOG.log(Level.SEVERE,"The offset of the video is < 0 : "+l__firstMP4Offset);
@@ -358,7 +392,7 @@ public class Video {
 					return false;
 				}		
 			}
-			AMRT.LOG.log(Level.FINE,"First offset of the video found at position : %x",l__firstMP4Offset);
+			AMRT.LOG.log(Level.FINE,"First offset of the video found at position : 0x%x",l__firstMP4Offset);
 			
 	
 			// Create output files
@@ -400,7 +434,7 @@ public class Video {
 				
 				// If next block is found
 				if ( l__isPresent ) {
-					AMRT.LOG.log(Level.FINEST,"Offset of the next block stream found at position : %x",l__current.blockOffset+l__current.blockSize);
+					AMRT.LOG.log(Level.FINEST,"Offset of the next block stream found at position : 0x%x",l__current.blockOffset+l__current.blockSize);
 					
 					// Copy to the output file
 					try {

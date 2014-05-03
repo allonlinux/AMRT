@@ -126,7 +126,7 @@ public class AMRT {
 		LOG.log(Level.INFO,"Parameters :");
 		LOG.log(Level.INFO,"- input file : "+l__inputFile);
 		LOG.log(Level.INFO,"- output directory : "+outputDirectory);
-		LOG.log(Level.INFO,"- cluster size : %x",FILESYSTEM_CLUSTER_SIZE);
+		LOG.log(Level.INFO,"- cluster size : 0x%x",FILESYSTEM_CLUSTER_SIZE);
 		LOG.log(Level.INFO,"\n");
 		
 		// Create the list of medias to search given their binary header
@@ -144,10 +144,10 @@ public class AMRT {
 			// - check for previously found medias
 			if ( l__mediaListFile.exists() ) {
 				FileInputStream l__fileInputStrean = new FileInputStream(l__mediaListFile);
-		        ObjectInputStream l__objectInputStream = new ObjectInputStream(l__fileInputStrean);
-		        l__mediaList = (ArrayList<MediaOccurence>) l__objectInputStream.readObject();
-		        l__objectInputStream.close();
-		        l__fileInputStrean.close();
+				ObjectInputStream l__objectInputStream = new ObjectInputStream(l__fileInputStrean);
+				l__mediaList = (ArrayList<MediaOccurence>) l__objectInputStream.readObject();
+				l__objectInputStream.close();
+				l__fileInputStrean.close();
 			}
 			// - otherwise, find them and serialize the result
 			else {
