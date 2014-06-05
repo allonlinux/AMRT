@@ -28,6 +28,8 @@ public class Video {
 	// --> audio detection : 21
 	static final byte AudioStreamPattern[]={0x21};
 	
+	static long g__lastHeaderOffset=0;
+	
 	public MediaCodec codec;
 	
 	public long headerSize;
@@ -157,6 +159,7 @@ public class Video {
 			for(int i=0;i<l__nbVideoChunks;i++) {
 				int l__currentSize=l__headerBytes.getInt();
 				l__result.offsets.add(new MediaStreamOffset(StreamType.Video,l__currentSize));
+				//System.out.printf("Offset : %x\n",l__currentSize);
 			}
 			// Set the number of frames
 			l__result.nbFrames=l__nbVideoChunks;
@@ -209,6 +212,9 @@ public class Video {
 		FileOutputStream l__outputFileStreamMP4=null;
 		Video l__video=null;
 		
+		long l__previousLastHeaderOffset=g__lastHeaderOffset;
+		g__lastHeaderOffset=i__video.offset;
+		
 		try {
 			// Read the video information from the video
 			l__video=Video.readHeader(i__stream, i__video.offset,i__video.pattern);
@@ -227,9 +233,11 @@ public class Video {
 			
 			// It seems that, sometimes, there is a small gap of empty clusters between the data and the header.
 			// Because of that, we must go backward a little bit to be sure to get the beginning of the data...
-			l__firstOffset-=5*AMRT.FILESYSTEM_CLUSTER_SIZE;
-			if (l__firstOffset < -AMRT.FILESYSTEM_CLUSTER_SIZE)
-				l__firstOffset= -AMRT.FILESYSTEM_CLUSTER_SIZE;
+			for (int i=0;i<10;i++) {
+				if (l__firstOffset-AMRT.FILESYSTEM_CLUSTER_SIZE < l__previousLastHeaderOffset)
+					break;
+				l__firstOffset-=AMRT.FILESYSTEM_CLUSTER_SIZE;
+			}
 			
 			// Find the beginning of the MP4 video
 			while ( true ) {
@@ -344,6 +352,9 @@ public class Video {
 		Video l__videoMP4=null;
 		Video l__videoLRV=null;
 		
+		long l__previousLastHeaderOffset=g__lastHeaderOffset;
+		g__lastHeaderOffset=i__mediaLRV.offset;
+		
 		try {
 			// Read the video information from both videos
 			l__videoMP4=Video.readHeader(i__stream, i__mediaMP4.offset,i__mediaMP4.pattern);
@@ -367,14 +378,18 @@ public class Video {
 			else
 				l__firstMP4Offset=(i__mediaMP4.offset-l__videoLRV.dataSize-l__videoMP4.dataSize)+AMRT.FILESYSTEM_CLUSTER_SIZE+(l__videoMP4.offsets.get(0).offset %AMRT.FILESYSTEM_CLUSTER_SIZE);
 			
-			// It seems that, sometimes, there is a small gap of empty clusters between the data and the header.
-			// Because of that, we must go backward a little bit to be sure to get the beginning of the data...
-			l__firstMP4Offset-=5*AMRT.FILESYSTEM_CLUSTER_SIZE;
-			
 			// Check that the offset is valid
 			if ( l__firstMP4Offset < 0 ) {
 				AMRT.LOG.log(Level.SEVERE,"The offset of the video is < 0 : "+l__firstMP4Offset);
 				return true;
+			}
+			
+			// It seems that, sometimes, there is a small gap of empty clusters between the data and the header.
+			// Because of that, we must go backward a little bit to be sure to get the beginning of the data...
+			for (int i=0;i<10;i++) {
+				if (l__firstMP4Offset-AMRT.FILESYSTEM_CLUSTER_SIZE < l__previousLastHeaderOffset)
+					break;
+				l__firstMP4Offset-=AMRT.FILESYSTEM_CLUSTER_SIZE;
 			}
 			
 			// Find the beginning of the MP4 video
@@ -392,7 +407,7 @@ public class Video {
 					return false;
 				}		
 			}
-			AMRT.LOG.log(Level.FINE,"First offset of the video found at position : 0x%x",l__firstMP4Offset);
+			AMRT.LOG.log(Level.INFO,"First offset of the video found at position : 0x%x",l__firstMP4Offset);
 			
 	
 			// Create output files
@@ -416,7 +431,7 @@ public class Video {
 			
 			// Write THM file
 			if (i__mediaTHM !=null ) {
-				i__stream.transferTo( i__mediaTHM.offset, l__firstMP4Offset-i__mediaTHM.offset, l__outputTHM);
+				i__stream.transferTo( i__mediaTHM.offset,AMRT.FILESYSTEM_CLUSTER_SIZE, l__outputTHM);
 				l__outputTHM.close();
 			}
 			
@@ -424,7 +439,16 @@ public class Video {
 			i__stream.transferTo( i__mediaMP4.offset,l__videoMP4.headerSize, l__outputMP4);
 			i__stream.transferTo( i__mediaLRV.offset, l__videoLRV.headerSize, l__outputLRV);
 			
+			boolean l__skipNext=false;
+			
 			while ( l__current != null ) {
+				// Check if next block is in the middle of the THM, as it seems that it can be in the middle of the video data...
+				if ( (l__current.blockOffset <  i__mediaTHM.offset) && (l__current.blockOffset+l__current.blockSize > i__mediaTHM.offset) ) {
+					AMRT.LOG.log(Level.INFO,"Skipping cluster because the current one belongs to the THM media");
+					l__current.blockOffset+=AMRT.FILESYSTEM_CLUSTER_SIZE;
+					l__skipNext=true;
+				}
+				
 				// Check if next block is present at the good position
 				boolean l__isPresent=isMediaPresent(i__stream,l__current.blockOffset+l__current.blockSize,l__current.video.offsets.get(l__current.blockIndex+1).type);
 				
@@ -438,7 +462,15 @@ public class Video {
 					
 					// Copy to the output file
 					try {
-						i__stream.transferTo( l__current.blockOffset, l__current.blockSize, l__current.channel);
+						// In case next block is in the middle of the THM
+						if ( l__skipNext ) {
+							i__stream.transferTo(l__current.blockOffset-AMRT.FILESYSTEM_CLUSTER_SIZE, l__current.blockSize, l__current.channel);
+							l__skipNext=false;
+						}
+						// In normal case
+						else {
+							i__stream.transferTo( l__current.blockOffset, l__current.blockSize, l__current.channel);
+						}
 					} catch (Exception e) {
 						e.printStackTrace();
 					}
@@ -482,8 +514,19 @@ public class Video {
 					long l__startOffset=l__current.blockOffset+l__modulo;
 					long l__currentOffset=l__startOffset;
 					
+					// If it is the first offset of the LRV video
+					if ( l__other.blockIndex < 0 ) {
+						l__other.blockSize=l__videoLRV.offsets.get(0).offset %AMRT.FILESYSTEM_CLUSTER_SIZE;
+					}
+					
 					// Search for the next block of the "other" video in the next clusters
 					while ( true ) {
+						// Check that we are not in the middle of the THM, as it seems that it can be in the middle of the video data...
+						if ( (l__current.blockOffset <  i__mediaTHM.offset) && (l__current.blockOffset+l__current.blockSize > i__mediaTHM.offset) ) {
+							AMRT.LOG.log(Level.INFO,"Skipping cluster because the current one belongs to the THM media");
+							l__current.blockOffset+=AMRT.FILESYSTEM_CLUSTER_SIZE;
+						}
+						
 						// Check if the block of the "other" video is present in the current cluster
 						if ( isMediaPresent(i__stream, l__currentOffset+l__other.blockSize, l__other.video.offsets.get(l__other.blockIndex+1).type) ) {
 							break;
