@@ -94,11 +94,16 @@ public class Video {
 		i__stream.position(i__headerOffset+0x20);
 		l__4Bytes.clear();i__stream.read(l__4Bytes);l__4Bytes.rewind();
 		l__result.headerSize=l__4Bytes.getInt()+0x20; // header = size + pre-header=0x20
-		// - 4 bytes to get the "free" ATOM size if it is a "avc1" video (GoPro Hero 3+)
+		// - 4 bytes to get the "free" ATOM size - if it exists
 		if ( i__pattern.codec.equals(MediaCodec.MP4_avc1) ) {
-			i__stream.position(i__headerOffset+l__result.headerSize);
+			i__stream.position(i__headerOffset+l__result.headerSize+4);
 			l__4Bytes.clear();i__stream.read(l__4Bytes);l__4Bytes.rewind();
-			l__result.headerSize+=l__4Bytes.getInt();
+			l__string=new String(l__4Bytes.array(), "ASCII");
+			if ( l__string.equals("free") ) {
+				i__stream.position(i__headerOffset+l__result.headerSize);
+				l__4Bytes.clear();i__stream.read(l__4Bytes);l__4Bytes.rewind();
+				l__result.headerSize+=l__4Bytes.getInt();
+			}
 		}
 		// - 8 bytes
 		l__result.headerSize+=8;
