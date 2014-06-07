@@ -448,10 +448,12 @@ public class Video {
 			
 			while ( l__current != null ) {
 				// Check if next block is in the middle of the THM, as it seems that it can be in the middle of the video data...
-				if ( (l__current.blockOffset <  i__mediaTHM.offset) && (l__current.blockOffset+l__current.blockSize > i__mediaTHM.offset) ) {
-					AMRT.LOG.log(Level.INFO,"Skipping cluster because the current one belongs to the THM media");
-					l__current.blockOffset+=AMRT.FILESYSTEM_CLUSTER_SIZE;
-					l__skipNext=true;
+				if (i__mediaTHM !=null) {
+					if ( (l__current.blockOffset <  i__mediaTHM.offset) && (l__current.blockOffset+l__current.blockSize > i__mediaTHM.offset) ) {
+						AMRT.LOG.log(Level.INFO,"Skipping cluster because the current one belongs to the THM media");
+						l__current.blockOffset+=AMRT.FILESYSTEM_CLUSTER_SIZE;
+						l__skipNext=true;
+					}
 				}
 				
 				// Check if next block is present at the good position
@@ -527,9 +529,11 @@ public class Video {
 					// Search for the next block of the "other" video in the next clusters
 					while ( true ) {
 						// Check that we are not in the middle of the THM, as it seems that it can be in the middle of the video data...
-						if ( (l__current.blockOffset <  i__mediaTHM.offset) && (l__current.blockOffset+l__current.blockSize > i__mediaTHM.offset) ) {
-							AMRT.LOG.log(Level.INFO,"Skipping cluster because the current one belongs to the THM media");
-							l__current.blockOffset+=AMRT.FILESYSTEM_CLUSTER_SIZE;
+						if (i__mediaTHM !=null) {
+							if ( (l__current.blockOffset <  i__mediaTHM.offset) && (l__current.blockOffset+l__current.blockSize > i__mediaTHM.offset) ) {
+								AMRT.LOG.log(Level.INFO,"Skipping cluster because the current one belongs to the THM media");
+								l__current.blockOffset+=AMRT.FILESYSTEM_CLUSTER_SIZE;
+							}
 						}
 						
 						// Check if the block of the "other" video is present in the current cluster
