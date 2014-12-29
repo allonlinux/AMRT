@@ -1,13 +1,14 @@
-package fr.free.allonlinux.amrt;
+package fr.free.allonlinux.amrt.utils;
 
 import java.util.logging.Formatter;
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
 
-public class LogFormatter extends Formatter {
-
+public class LogFormatter extends Formatter
+{
 	@Override
-	public String format(LogRecord i__logRecord) {
+	public String format(LogRecord i__logRecord)
+	{
 		String l__result="";
 		
 		if (i__logRecord.getLevel().equals(Level.SEVERE))
@@ -20,5 +21,4 @@ public class LogFormatter extends Formatter {
 		
 		return l__result;
 	}
-	
 }
