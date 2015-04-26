@@ -129,8 +129,33 @@ public class ResultPanel extends JPanel implements ActionListener
 					{
 						// Protune "OFF"
 						case THM:
+						case JPEG:
 						{
-							// If : THM/VIDEO_1/VIDEO_2
+							try {
+								// Read at most 25MB from the recovery file
+								// - compute reading size
+								long l__readSize=25000000;
+								if ( i < l__medias.length-1 )
+									l__readSize=Math.min(l__medias[i+1].offset-l__medias[i].offset, l__readSize);
+								// - read buffer from file
+								ByteBuffer l__imageBuffer = ByteBuffer.allocate((int)l__readSize);
+								l__imageBuffer.clear();
+								l__channel.position(l__medias[i].offset);
+								int l__size=l__channel.read(l__imageBuffer);
+								AMRT.g__log.log(Level.FINE,"Image reading size from file = "+l__size);
+								l__imageBuffer.rewind();
+								// - try opening image
+								BufferedImage l__javaImage=ImageIO.read(new ByteArrayInputStream(l__imageBuffer.array()));
+								
+								// Write output image using PNG format
+								ImageIO.write(l__javaImage,"PNG", new File(AMRT.g__outputDirectory+"GOPRO__"+i+".PNG"));
+								
+								AMRT.g__log.log(Level.INFO,"Successfuly recovered image : "+"GOPRO__"+i+".PNG");
+							} catch(Exception e) {
+								AMRT.g__log.log(Level.SEVERE,"Failed recovering image... ");
+							}
+							
+							// If : (THM or JPEG)/VIDEO_1/VIDEO_2
 							if (	i+2 < l__medias.length && 
 									(l__medias[i+1].descriptor.codec == MediaCodecEnum.MP4_mp42 || l__medias[i+1].descriptor.codec == MediaCodecEnum.MP4_avc1)  && 
 									(l__medias[i+2].descriptor.codec == MediaCodecEnum.MP4_mp42 || l__medias[i+2].descriptor.codec == MediaCodecEnum.MP4_avc1) )
@@ -147,9 +172,9 @@ public class ResultPanel extends JPanel implements ActionListener
 						case MP4_mp42:
 						case MP4_avc1:
 						{
-							// If : VIDEO_1/THM/VIDEO_2
+							// If : VIDEO_1/(THM or JPEG)/VIDEO_2
 							if (	i+2 < l__medias.length && 
-									(l__medias[i+1].descriptor.codec == MediaCodecEnum.THM) && 
+									(l__medias[i+1].descriptor.codec == MediaCodecEnum.THM || l__medias[i+1].descriptor.codec == MediaCodecEnum.JPEG) && 
 									(l__medias[i+2].descriptor.codec == MediaCodecEnum.MP4_mp42 || l__medias[i+2].descriptor.codec == MediaCodecEnum.MP4_avc1) )
 							{
 								boolean l__result=VideoDecoder.recover(l__channel,l__medias[i+1],l__medias[i],l__medias[i+2]);
@@ -160,10 +185,10 @@ public class ResultPanel extends JPanel implements ActionListener
 								}
 							}
 							
-							// If : VIDEO_1/VIDEO_2/THM
+							// If : VIDEO_1/VIDEO_2/(THM or JPEG)
 							if (	i+2 < l__medias.length && 
 									(l__medias[i+1].descriptor.codec == MediaCodecEnum.MP4_mp42 || l__medias[i+1].descriptor.codec == MediaCodecEnum.MP4_avc1)  && 
-									(l__medias[i+2].descriptor.codec == MediaCodecEnum.THM) )
+									(l__medias[i+2].descriptor.codec == MediaCodecEnum.THM || l__medias[i+2].descriptor.codec == MediaCodecEnum.JPEG) )
 							{
 								boolean l__result=VideoDecoder.recover(l__channel,l__medias[i+2],l__medias[i],l__medias[i+1]);
 								if (l__result)
@@ -191,33 +216,6 @@ public class ResultPanel extends JPanel implements ActionListener
 								VideoDecoder.recover(l__channel,l__medias[i]);
 							}
 						}  break;
-					
-						case JPEG:
-						{
-							try {
-								// Read at most 25MB from the recovery file
-								// - compute reading size
-								long l__readSize=25000000;
-								if ( i < l__medias.length-1 )
-									l__readSize=Math.min(l__medias[i+1].offset-l__medias[i].offset, l__readSize);
-								// - read buffer from file
-								ByteBuffer l__imageBuffer = ByteBuffer.allocate((int)l__readSize);
-								l__imageBuffer.clear();
-								l__channel.position(l__medias[i].offset);
-								int l__size=l__channel.read(l__imageBuffer);
-								AMRT.g__log.log(Level.FINE,"Image reading size from file = "+l__size);
-								l__imageBuffer.rewind();
-								// - try opening image
-								BufferedImage l__javaImage=ImageIO.read(new ByteArrayInputStream(l__imageBuffer.array()));
-								
-								// Write output image using PNG format
-								ImageIO.write(l__javaImage,"PNG", new File(AMRT.g__outputDirectory+"GOPRO__"+i+".PNG"));
-								
-								AMRT.g__log.log(Level.INFO,"Successfuly recovered image : "+"GOPRO__"+i+".PNG");
-							} catch(Exception e) {
-								AMRT.g__log.log(Level.SEVERE,"Failed recovering image... ");
-							}
-						} break;
 						
 						default:
 						{

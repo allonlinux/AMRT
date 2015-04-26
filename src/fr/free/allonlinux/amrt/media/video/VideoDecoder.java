@@ -395,13 +395,12 @@ public class VideoDecoder
 			// Check that the offset is valid (= not before the last detected video)
 			if ( l__firstMP4Offset < AMRT.g__lastHeaderOffset )
 			{
-				AMRT.g__log.log(Level.SEVERE,"The offset of the video is not valid : "+l__firstMP4Offset +" < "+ AMRT.g__lastHeaderOffset);
-				return true;
+				AMRT.g__log.log(Level.WARNING,"The offset of the video is not valid : "+l__firstMP4Offset +" < "+ AMRT.g__lastHeaderOffset);
 			}
 			
 			// It seems that, sometimes, there is a small gap of empty clusters between the data and the header.
 			// Because of that, we must go backward a little bit to be sure to get the beginning of the data...
-			l__firstMP4Offset=Math.max(AMRT.g__lastHeaderOffset+(l__videoMP4.offsets.get(0).offset %AMRT.g__filesystemClusterSize), l__firstMP4Offset - 20*AMRT.g__filesystemClusterSize);
+			l__firstMP4Offset=Math.min(l__firstMP4Offset, Math.max(AMRT.g__lastHeaderOffset+(l__videoMP4.offsets.get(0).offset %AMRT.g__filesystemClusterSize), l__firstMP4Offset - 20*AMRT.g__filesystemClusterSize));
 			
 			// ... and then, go forward again in order to find the beginning of the MP4 video
 			while ( true )
